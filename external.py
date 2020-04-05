@@ -32,21 +32,7 @@ def extract_csv(args):
                 whitespace = table.whitespace
                 order = table.order
                 top_row_json = json.dumps(table.df.iloc[0].tolist())
-                s = io.StringIO()
-                table.to_csv(s, index=False, header=False, encoding="utf-8-sig")
-                csv_text = s.getvalue()
-                # print(f"csvId: {csv_id}")
-                # print(f"csvFileName: {csv_file_name}")
-                # print(f"pdfId: {pdf_id}")
-                # print(f"page: {page}")
-                # print(f"tableNumber: {table_number}")
-                # print(f"csvPath: {csv_full_path}")
-                # print(f"topRowJson: {top_row_json}")
-                # print(f"rows: {rows}")
-                # print(f"columns: {columns}")
-                # print(f"method: {method}")
-                # print(f"accuracy: {accuracy}")
-                # print(f"whitespace: {whitespace}")
+                csv_text = table.df.to_json(None, orient='values')
                 table.to_csv(csv_full_path, index=False, header=False, encoding="utf-8-sig")
 
                 with engine.connect() as conn:
