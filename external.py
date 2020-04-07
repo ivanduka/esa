@@ -23,7 +23,6 @@ def extract_csv(args):
         start_time = time.time()
 
         def save_tables(tables, page, method):
-            print(f"{pdf_id} on page {page}: found {len(tables)} tables with {method}")
             for index, table in enumerate(tables):
                 table_number = index + 1
                 csv_id = f"{pdf_id}_{page}_{method}_{table_number}"
@@ -50,25 +49,27 @@ def extract_csv(args):
                                                       "csvColumns": csvColumns, "method": method,
                                                       "accuracy": accuracy, "whitespace": whitespace,
                                                       "csvText": csv_text})
-                print(f"{pdf_id} on page {page}: inserted {result.rowcount} rows for CSV {csv_id}")
 
         try:
             pdf_file_path = pdf_files_folder.joinpath(f"{pdf_id}.pdf")
-            
+
             for page in range(1, total_pages + 1):
-                tables = camelot.read_pdf(str(pdf_file_path), pages=str(page), strip_text='\n',
-                                        line_scale=40, flag_size=True, copy_text=['v'],)
-                save_tables(tables, page, "lattice-v")
-                print(f"{pdf_id} on page {page}: done successfully.")
-            
+                try:
+                    tables = camelot.read_pdf(str(pdf_file_path), pages=str(page), strip_text='\n',
+                                              line_scale=40, flag_size=True, copy_text=['v'],)
+                    save_tables(tables, page, "lattice-v")
+                except Exception as e:
+                    print(f'Error processing {pdf_id} on page {page}:')
+                    print(e)
+                    traceback.print_tb(e.__traceback__)
+
             with engine.connect() as conn:
                 statement = text("UPDATE esa.pdfs SET csvsExtracted = :csvsExtracted WHERE pdfId = :pdfId;")
                 result = conn.execute(statement, {"csvsExtracted": 'true', "pdfId": pdf_id})
-            print(f"{pdf_id}: updated {result.rowcount} for {pdf_id} (csvsExtracted)")
             duration = round(time.time() - start_time)
-            print(f"\nDone {total_pages} items in {duration} seconds ({round(duration/60, 2)} min or {round(duration/3600, 2)} hours)")
+            print(f"{pdf_id}: done {total_pages} pages in {duration} seconds ({round(duration/60, 2)} min or {round(duration/3600, 2)} hours)")
         except Exception as e:
-            print(f'Error processing {pdf_id} on page {page}:')
+            print(f'Error processing {pdf_id}:')
             print(e)
             traceback.print_tb(e.__traceback__)
         finally:
