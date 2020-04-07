@@ -10,17 +10,19 @@ import pandas as pd
 import traceback
 import io
 import json
+import time
 
 
 def extract_csv(args):
     buf = StringIO()
     with redirect_stdout(buf), redirect_stderr(buf):
-        pdf_id, page, engine_string, pdf_files_folder_string, csv_tables_folder_string = args
+        pdf_id, total_pages, engine_string, pdf_files_folder_string, csv_tables_folder_string = args
         pdf_files_folder = Path(pdf_files_folder_string)
         csv_tables_folder = Path(csv_tables_folder_string)
         engine = create_engine(engine_string)
+        start_time = time.time()
 
-        def save_tables(tables, method):
+        def save_tables(tables, page, method):
             print(f"{pdf_id} on page {page}: found {len(tables)} tables with {method}")
             for index, table in enumerate(tables):
                 table_number = index + 1
@@ -52,10 +54,19 @@ def extract_csv(args):
 
         try:
             pdf_file_path = pdf_files_folder.joinpath(f"{pdf_id}.pdf")
-            tables = camelot.read_pdf(str(pdf_file_path), pages=str(page), strip_text='\n',
-                                      line_scale=40, flag_size=True, copy_text=['v'],)
-            save_tables(tables, "lattice-v")
-            print(f"{pdf_id} on page {page}: done successfully.")
+            
+            for page in range(1, total_pages + 1):
+                tables = camelot.read_pdf(str(pdf_file_path), pages=str(page), strip_text='\n',
+                                        line_scale=40, flag_size=True, copy_text=['v'],)
+                save_tables(tables, page, "lattice-v")
+                print(f"{pdf_id} on page {page}: done successfully.")
+            
+            with engine.connect() as conn:
+                statement = text("UPDATE esa.pdfs SET csvsExtracted = :csvsExtracted WHERE pdfId = :pdfId;")
+                result = conn.execute(statement, {"csvsExtracted": 'true', "pdfId": pdf_id})
+            print(f"{pdf_id}: updated {result.rowcount} for {pdf_id} (csvsExtracted)")
+            duration = round(time.time() - start_time)
+            print(f"\nDone {total_pages} items in {duration} seconds ({round(duration/60, 2)} min or {round(duration/3600, 2)} hours)")
         except Exception as e:
             print(f'Error processing {pdf_id} on page {page}:')
             print(e)
